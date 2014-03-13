@@ -33,6 +33,13 @@ public class EdgeCompiler
                 return await this.ExecuteNonQuery(connectionString, command, (IDictionary<string, object>)queryParameters);
             };
         }
+        else if (command.StartsWith("exec ", StringComparison.InvariantCultureIgnoreCase))
+        {
+            return async (queryParameters) =>
+            {
+                return await this.ExecuteStoredProcedure(connectionString, command, (IDictionary<string, object>)queryParameters);
+            };
+        }
         else
         {
             throw new InvalidOperationException("Unsupported type of SQL command. Only select, insert, update, and delete are supported.");
@@ -50,6 +57,16 @@ public class EdgeCompiler
         }
     }
 
+    private async Task<object> ExecuteStoredProcedure(string connectionString, string commandString, IDictionary<string, object> parameters)
+    {       
+        
+        return await this.ExecuteQuery(connectionString, commandString.Substring(5).Trim(), (IDictionary<string, object>)parameters);                
+        /*using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            return await this.ExecuteQuery(connectionString, commandString.Substring(5).Trim(), (IDictionary<string, object>)parameters);                    
+        }*/
+    }
+
     private async Task<object> ExecuteQuery(string connectionString, string commandString, IDictionary<string, object> parameters)
     {
         var rows = new List<object>();
@@ -58,6 +75,14 @@ public class EdgeCompiler
         {
             using (var command = new SqlCommand(commandString, connection))
             {
+                if (commandString.StartsWith("select ", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    command.CommandType = CommandType.Text;
+                }
+                else
+                {
+                    command.CommandType = CommandType.StoredProcedure;
+                }                
                 this.AddParamaters(command, parameters);
                 await connection.OpenAsync();
                 using (var reader = await command.ExecuteReaderAsync(CommandBehavior.CloseConnection))
